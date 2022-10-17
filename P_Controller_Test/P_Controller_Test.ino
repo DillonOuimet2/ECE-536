@@ -8,7 +8,7 @@
 #if DEBUG == 1
 #define debugln(x) Serial.println(x)
 #define output(x) Serial.println(x) // Print newline char when debugging for clarity
-#define debugDelay(x) delay(x) // For Debug Serial Monitor Delay
+#define debugDelay(x) delay(x)      // For Debug Serial Monitor Delay
 #else
 #define debugln(x)
 #define output(x) Serial.print(x) // Don't print newline char when not debugging
@@ -23,38 +23,26 @@
 #define PLXoutln(x)
 #endif
 
-void setupEncoder  ( uint8_t   ela_pin, uint8_t   elb_pin, uint8_t   era_pin, uint8_t   erb_pin );  // initalize the encoders
+void setupEncoder(uint8_t ela_pin, uint8_t elb_pin, uint8_t era_pin, uint8_t erb_pin); // initalize the encoders
 
-#define driveSpeed 20      // This was a good motor speed to complete this lab
-#define TurnSpd 10
+const int trigPin = 32; // This is Port Pin 3.5 on the MSP432 Launchpad
+const int echoPin = 33; // This is Port Pin 5.1 on the MSP432 Launchpad
 
-const int trigPin = 32;  //This is Port Pin 3.5 on the MSP432 Launchpad
-const int echoPin = 33; //This is Port Pin 5.1 on the MSP432 Launchpad
+uint8_t lineColor = DARK_LINE; // DARK_LINE or LIGHT_LINE
+bool isCalibrationComplete = false;
 
-int lWheelSpeed = driveSpeed  ;
-int rWheelSpeed = driveSpeed+1 ;
+uint16_t Speed = 30;
 
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
 uint16_t sensorMaxVal[LS_NUM_SENSORS];
 uint16_t sensorMinVal[LS_NUM_SENSORS];
 
-uint16_t LSpeed = 20;
-uint16_t RSpeed = 20;
-uint16_t Speed = 30;
-//uint16_t fastSpeed = 100;
-int center = 3500;
-int error;
-double adjustment;
-
-// Range of output/ max error
-double Ke = 0.5/3500; 
+// P Controller
+double Ke = 0.5 / 3500; // Range of output/max error
 double DR = 0.5;
-/* Valid values are either:
-    DARK_LINE  if your floor is lighter than your line
-    LIGHT_LINE if your floor is darker than your line
-*/
-uint8_t lineColor = DARK_LINE;
+double correction = 10; // Correction for Distance from Axle
+int center = 3500;
 
 void setup()
 {
@@ -65,22 +53,31 @@ void setup()
   PLXoutln("RESETTIMER");
 
   setupRSLK();
-  /* Left button on Launchpad */
-  setupWaitBtn(LP_LEFT_BTN);
-  /* Red led in rgb led */
-  setupLed(RED_LED);
+  setupWaitBtn(LP_LEFT_BTN);  /* Left button on Launchpad */
+  setupLed(RED_LED);   /* Red led in rgb led */
   clearMinMax(sensorMinVal, sensorMaxVal);
-  
+
   delay(1000);
 }
 
-void floorCalibration() {
+void simpleCalibrate()
+{
+  //Calibrate with Multiple Data
+  for (int x = 0; x < 1000; x++)
+  {
+    readLineSensor(sensorVal);
+    setSensorMinMax(sensorVal, sensorMinVal, sensorMaxVal);
+  }
+}
+
+void floorCalibration()
+{
   /* Place Robot On Floor (no line) */
   delay(2000);
   String btnMsg = "Push left button on Launchpad to begin calibration.\n";
   btnMsg += "Make sure the robot is on the floor away from the line.\n";
   /* Wait until button is pressed to start robot */
-  //waitBtnPressed(LP_LEFT_BTN, btnMsg, RED_LED);
+  waitBtnPressed(LP_LEFT_BTN, btnMsg, RED_LED); //Turn off for system ID
 
   delay(1000);
 
@@ -91,93 +88,55 @@ void floorCalibration() {
   btnMsg = "Push left button on Launchpad to begin line following.\n";
   btnMsg += "Make sure the robot is on the line.\n";
   /* Wait until button is pressed to start robot */
-  //waitBtnPressed(LP_LEFT_BTN, btnMsg, RED_LED);
+  waitBtnPressed(LP_LEFT_BTN, btnMsg, RED_LED); //Turn off for system ID
   delay(1000);
 
   enableMotor(BOTH_MOTORS);
-}
-
-void simpleCalibrate() {
-  /* Set both motors direction forward */
   setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
-  /* Enable both motors */
-  enableMotor(BOTH_MOTORS);
-  /* Set both motors speed 20 */
-  setMotorSpeed(BOTH_MOTORS, 20);
-
-  for (int x = 0; x < 100; x++) {
-    readLineSensor(sensorVal);
-    setSensorMinMax(sensorVal, sensorMinVal, sensorMaxVal);
-      /* Disable both motors */
-  disableMotor(BOTH_MOTORS);
 }
-  }
 
-  bool isCalibrationComplete = false;
-
-uint32_t getPosition(){
-  uint32_t linePos;
+uint32_t getPosition()
+{
   readLineSensor(sensorVal);
   readCalLineSensor(sensorVal, sensorCalVal, sensorMinVal, sensorMaxVal, lineColor);
-  //could use average
+  // could use average
   return getLinePosition(sensorCalVal, lineColor);
 }
 
-void loop() {
 
+void loop()
+{
+  uint32_t lastPos;
   /* Run this setup only once */
-  if (isCalibrationComplete == false) {
+  if (isCalibrationComplete == false)
+  {
     floorCalibration();
     isCalibrationComplete = true;
+    lastPos = getPosition();
   }
 
-  
   uint32_t linePos = getPosition();
-  //start P logic
-  double correction = 1000;
-  
-  
-  error =   linePos-center;
-  if (error > 0){
+  uint32_t estPos = (lastPos + linePos + getPosition())/3;
+  int error = estPos - center;
+
+  lastPos = linePos;
+  if (estPos > 0)
+  {
     error = error - correction;
   }
-  else{
+  else
+  {
     error = error + correction;
   }
-  adjustment = error*Ke;
   
-//  RSpeed = constrain(RSpeed - Ke * error, 0, 20);
-//  LSpeed = constrain(LSpeed + Ke * error, 0, 20);
-
-// RSpeed = constrain(RSpeed - Ke * error, 0, 20);
-// LSpeed = constrain(LSpeed + Ke * error, 0, 20);
-
+  double adjustment = error * Ke;
   double DRnow = DR + adjustment;
-  DRnow = constrain(DRnow,0 ,1);
-  
+  DRnow= constrain(DRnow, 0, 1);
+  setMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
+  setMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
+
   debugln("linePos = " + String(linePos) + " DR = " + String(DRnow) + " Error = " + String(error));
-  debugln(" LSpeed = " + String(DRnow*Speed) + " RSpeed = " + String((1-DRnow)*Speed));
-
-//    setMotorSpeed(LEFT_MOTOR, LSpeed);
-//    setMotorSpeed(RIGHT_MOTOR, RSpeed );
-//  setMotorSpeed(LEFT_MOTOR, constrain((DR) * Speed, 10, Speed));
-//  setMotorSpeed(RIGHT_MOTOR, constrain((1-DR) * Speed, 15, Speed));
-  setMotorSpeed(LEFT_MOTOR, ((DRnow) * Speed));
-  setMotorSpeed(RIGHT_MOTOR, ((1-DRnow) * Speed));
-
-  
-
-  
-//  if (linePos > 0 && linePos < 3000) { 
-//    setMotorSpeed(LEFT_MOTOR, normalSpeed);
-//    setMotorSpeed(RIGHT_MOTOR, fastSpeed);
-//  } else if (linePos > 3500) {
-//    setMotorSpeed(LEFT_MOTOR, fastSpeed);
-//    setMotorSpeed(RIGHT_MOTOR, normalSpeed);
-//  } else {
-//    setMotorSpeed(LEFT_MOTOR, normalSpeed);
-//    setMotorSpeed(RIGHT_MOTOR, normalSpeed);
-//  }
+  debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
 
   // PLX Data Out
   volatile unsigned long timeNow = millis();
@@ -192,8 +151,3 @@ void loop() {
   PLXoutln(" ,");
   delay(500);
 }
-
-
-
-
-  
