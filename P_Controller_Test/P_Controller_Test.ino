@@ -1,9 +1,9 @@
 #include "SimpleRSLK.h"
-#include "Encoder.h"
+
 
 // Debug Control
 #define DEBUG 0
-#define PLX 1
+#define PLX 0
 
 #if DEBUG == 1
 #define debugln(x) Serial.println(x)
@@ -31,7 +31,9 @@ const int echoPin = 33; // This is Port Pin 5.1 on the MSP432 Launchpad
 uint8_t lineColor = DARK_LINE; // DARK_LINE or LIGHT_LINE
 bool isCalibrationComplete = false;
 
-uint16_t Speed = 30;
+uint8_t Speed = 20;
+uint8_t LSpeed = 20;
+uint8_t RSpeed = 20;
 
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
@@ -39,9 +41,9 @@ uint16_t sensorMaxVal[LS_NUM_SENSORS];
 uint16_t sensorMinVal[LS_NUM_SENSORS];
 
 // P Controller
-double Ke = 0.5 / 3500; // Range of output/max error
+double Ke = (0.001); // Range of output/max error
 double DR = 0.5;
-double correction = 10; // Correction for Distance from Axle
+double correction = 100; // Correction for Distance from Axle
 int center = 3500;
 
 void setup()
@@ -63,10 +65,11 @@ void setup()
 void simpleCalibrate()
 {
   //Calibrate with Multiple Data
-  for (int x = 0; x < 1000; x++)
+  for (int x = 0; x < 100; x++)
   {
     readLineSensor(sensorVal);
     setSensorMinMax(sensorVal, sensorMinVal, sensorMaxVal);
+ 
   }
 }
 
@@ -115,35 +118,60 @@ void loop()
     lastPos = getPosition();
   }
 
-  uint32_t linePos = getPosition();
-  uint32_t estPos = (lastPos + linePos + getPosition())/3;
-  int error = estPos - center;
+//  uint32_t linePos1 = getPosition();
+//  uint32_t linePos2 = getPosition();
+//  uint32_t linePos3 = getPosition();
+//  uint32_t linePos4 = getPosition();
+//  uint32_t linePos5 = getPosition();
+//  
+//  uint32_t avgPos = (linePos1 + linePos2 + linePos3 + linePos4 + linePos5)/5;
+  int error =  getPosition() - center;
 
-  lastPos = linePos;
-  if (estPos > 0)
-  {
-    error = error - correction;
-  }
-  else
-  {
-    error = error + correction;
-  }
+
+ // lastPos = avgPos;
+//  if (error > 0)
+//  {
+//    error = error - correction;
+//  }
+//  else
+//  {
+//    error = error + correction;
+//  }
   
   double adjustment = error * Ke;
   double DRnow = DR + adjustment;
-  DRnow= constrain(DRnow, 0, 1);
-  setMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
-  setMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
+  if (DRnow > 1){
+    DRnow = 1;
+  }
+  if(DRnow < 0){
+    DRnow = 0;
+  }
+  float p = error * Ke;
+  
+  uint8_t NewLS = constrain(LSpeed + p, 0, 100);
+  uint8_t NewRS = constrain(RSpeed - p, 0, 100);
+  
+//  uint8_t Left = (DRnow)*Speed;
+//  uint8_t Right = (1-DRnow)*Speed;
 
+   
+
+  setMotorSpeed(LEFT_MOTOR, (NewLS));
+  setMotorSpeed(RIGHT_MOTOR, (NewRS));
+
+  uint32_t LeftCount = getEncoderLeftCnt();
+  uint32_t RightCount = getEncoderRightCnt();
   debugln("linePos = " + String(linePos) + " DR = " + String(DRnow) + " Error = " + String(error));
   debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
+  debugln(" Left E Count: " + String(getEncoderLeftCnt()) + " Right E Count: " + String(RightCount));
+  
 
   // PLX Data Out
   volatile unsigned long timeNow = millis();
   PLXout("DATA, TIME,");
   PLXout(timeNow);
   PLXout(" ,");
-  PLXout(linePos);
+  PLXout(avgPos);
   PLXout(" ,");
   PLXout(DRnow);
   PLXout(" ,");
