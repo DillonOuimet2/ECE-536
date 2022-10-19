@@ -31,12 +31,15 @@ const int echoPin = 33; // This is Port Pin 5.1 on the MSP432 Launchpad
 uint8_t lineColor = DARK_LINE; // DARK_LINE or LIGHT_LINE
 bool isCalibrationComplete = false;
 
-uint16_t Speed = 30;
+uint16_t Speed = 0.3*255;
 
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
 uint16_t sensorMaxVal[LS_NUM_SENSORS];
 uint16_t sensorMinVal[LS_NUM_SENSORS];
+
+//
+int numRuns;
 
 // P Controller
 double Ke = 0.5 / 3500; // Range of output/max error
@@ -132,8 +135,8 @@ void loop()
   double adjustment = error * Ke;
   double DRnow = DR + adjustment;
   DRnow= constrain(DRnow, 0, 1);
-  setMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
-  setMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
+  setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
+  setRawMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
 
   debugln("linePos = " + String(linePos) + " DR = " + String(DRnow) + " Error = " + String(error));
   debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
@@ -149,5 +152,7 @@ void loop()
   PLXout(" ,");
   PLXout(error);
   PLXoutln(" ,");
-  delay(500);
+  //delay(500);
+  
+  numRuns = numRuns + 1;
 }
