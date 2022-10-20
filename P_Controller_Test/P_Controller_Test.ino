@@ -31,7 +31,7 @@ const int echoPin = 33; // This is Port Pin 5.1 on the MSP432 Launchpad
 uint8_t lineColor = DARK_LINE; // DARK_LINE or LIGHT_LINE
 bool isCalibrationComplete = false;
 
-uint16_t Speed = 0.3*255;
+uint16_t Speed = 30;
 
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
@@ -45,14 +45,14 @@ int numRuns;
 double Ke = 0.5 / 3500; // Range of output/max error
 double DR = 0.5;
 double correction = 10; // Correction for Distance from Axle
-int center = 3500;
+volatile int center = 2500;
 
 void setup()
 {
   Serial.begin(9600);
 
   PLXoutln("CLEARDATA");
-  PLXoutln("LABEL, Time, Time From Start, Sensor Output, Drive Ratio, Error");
+  PLXoutln("LABEL, Time, Time From Start, Sensor Output, Drive Ratio, Error, Center");
   PLXoutln("RESETTIMER");
 
   setupRSLK();
@@ -66,7 +66,7 @@ void setup()
 void simpleCalibrate()
 {
   //Calibrate with Multiple Data
-  for (int x = 0; x < 1000; x++)
+  for (int x = 0; x < 100; x++)
   {
     readLineSensor(sensorVal);
     setSensorMinMax(sensorVal, sensorMinVal, sensorMaxVal);
@@ -118,6 +118,10 @@ void loop()
     lastPos = getPosition();
   }
 
+  if (numRuns >= 100) {
+    center = 3500;
+  }
+
   uint32_t linePos = getPosition();
   uint32_t estPos = (lastPos + linePos + getPosition())/3;
   int error = estPos - center;
@@ -135,11 +139,11 @@ void loop()
   double adjustment = error * Ke;
   double DRnow = DR + adjustment;
   DRnow= constrain(DRnow, 0, 1);
-  setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
-  setRawMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
+  setMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
+  setMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
 
-  debugln("linePos = " + String(linePos) + " DR = " + String(DRnow) + " Error = " + String(error));
-  debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
+//  debugln("linePos = " + String(linePos) + " DR = " + String(DRnow) + " Error = " + String(error));
+//  debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
 
   // PLX Data Out
   volatile unsigned long timeNow = millis();
@@ -151,8 +155,11 @@ void loop()
   PLXout(DRnow);
   PLXout(" ,");
   PLXout(error);
+  PLXout(" ,");
+  PLXout(center);
   PLXoutln(" ,");
   //delay(500);
   
   numRuns = numRuns + 1;
+//   debugln("Number of Loop it. = " + String(numRuns))
 }
