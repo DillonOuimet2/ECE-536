@@ -123,7 +123,6 @@ void loop()
   }
 
 
-
   uint32_t linePos = getPosition();
   int error = linePos - center;
   
