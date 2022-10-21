@@ -1,5 +1,6 @@
 #include "SimpleRSLK.h"
 #include "Encoder.h"
+#include "Romi_Motor_Power.h"
 
 // Debug Control
 #define DEBUG 0
@@ -25,27 +26,28 @@
 
 void setupEncoder(uint8_t ela_pin, uint8_t elb_pin, uint8_t era_pin, uint8_t erb_pin); // initalize the encoders
 
+void setRawMotorSpeed(uint8_t motorNum, uint8_t speed);
+
 const int trigPin = 32; // This is Port Pin 3.5 on the MSP432 Launchpad
 const int echoPin = 33; // This is Port Pin 5.1 on the MSP432 Launchpad
 
 uint8_t lineColor = DARK_LINE; // DARK_LINE or LIGHT_LINE
 bool isCalibrationComplete = false;
 
-uint16_t Speed = 30;
+uint16_t Speed = 0.3*255;
 
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
 uint16_t sensorMaxVal[LS_NUM_SENSORS];
 uint16_t sensorMinVal[LS_NUM_SENSORS];
 
-//
+
 int numRuns;
 
 // P Controller
-double Ke = 0.5 / 3500; // Range of output/max error
+double Ke = 1.5*(0.5 / 3500); // Range of output/max error
 double DR = 0.5;
-double correction = 10; // Correction for Distance from Axle
-volatile int center = 2500;
+volatile int center = 3500;
 
 void setup()
 {
@@ -103,7 +105,9 @@ uint32_t getPosition()
   readLineSensor(sensorVal);
   readCalLineSensor(sensorVal, sensorCalVal, sensorMinVal, sensorMaxVal, lineColor);
   // could use average
+  
   return getLinePosition(sensorCalVal, lineColor);
+  
 }
 
 
@@ -118,28 +122,20 @@ void loop()
     lastPos = getPosition();
   }
 
-  uint32_t linePos = getPosition();
-  uint32_t estPos = (lastPos + linePos + getPosition())/3;
-  int error = estPos - center;
 
-  lastPos = linePos;
-  if (estPos > 0)
-  {
-    error = error - correction;
-  }
-  else
-  {
-    error = error + correction;
-  }
+  uint32_t linePos = getPosition();
+  int error = linePos - center;
+  
+
   
   double adjustment = error * Ke;
   double DRnow = DR + adjustment;
   DRnow= constrain(DRnow, 0, 1);
-  setMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
-  setMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
+  setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
+  setRawMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
 
-//  debugln("linePos = " + String(linePos) + " DR = " + String(DRnow) + " Error = " + String(error));
-//  debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
+  debugln("linePos = " + String(linePos) + " DR = " + String(DRnow) + " Error = " + String(error));
+  debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
 
   // PLX Data Out
   volatile unsigned long timeNow = millis();
@@ -152,7 +148,7 @@ void loop()
   PLXout(" ,");
   PLXout(error);
   PLXout(" ,");
-  PLXout(center);
+//  PLXout(estPos);
   PLXoutln(" ,");
   //delay(500);
   
