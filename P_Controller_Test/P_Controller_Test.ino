@@ -118,10 +118,6 @@ void loop()
     lastPos = getPosition();
   }
 
-  if (numRuns >= 100) {
-    center = 3500;
-  }
-
   uint32_t linePos = getPosition();
   uint32_t estPos = (lastPos + linePos + getPosition())/3;
   int error = estPos - center;
