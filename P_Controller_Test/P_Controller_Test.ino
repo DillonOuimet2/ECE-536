@@ -43,11 +43,20 @@ uint16_t sensorMinVal[LS_NUM_SENSORS];
 
 
 int numRuns;
+int error = 0;
 
 // P Controller
-double Ke = 1.5*(0.5 / 3500); // Range of output/max error
+double Ke = 0.000011832; // Range of output/max error
 double DR = 0.5;
 volatile int center = 3500;
+
+// I controller
+double Ki = 0.0000;
+double Kd = 0.0000073925;
+volatile unsigned long TimeStart = millis();
+volatile unsigned long TimeEnd= millis();
+double i;
+
 
 void setup()
 {
@@ -113,6 +122,7 @@ uint32_t getPosition()
 
 void loop()
 {
+  
   uint32_t lastPos;
   /* Run this setup only once */
   if (isCalibrationComplete == false)
@@ -124,11 +134,22 @@ void loop()
 
 
   uint32_t linePos = getPosition();
-  int error = linePos - center;
+  //Adding the integration and dif.
+  TimeEnd = millis();
   
-
+  unsigned long dTime = TimeEnd - TimeStart;
   
-  double adjustment = error * Ke;
+  i += dTime*(error);
+  double d = (error)/dTime;
+  TimeStart = millis();
+  
+  error = linePos - center;
+  i -= dTime*error;
+  d -= (error)/dTime;
+  
+   
+  
+  double adjustment = (error * Ke) + (i*Ki)+ (d*Kd);
   double DRnow = DR + adjustment;
   DRnow= constrain(DRnow, 0, 1);
   setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
@@ -148,7 +169,7 @@ void loop()
   PLXout(" ,");
   PLXout(error);
   PLXout(" ,");
-//  PLXout(estPos);
+  PLXout(dTime);
   PLXoutln(" ,");
   //delay(500);
   
