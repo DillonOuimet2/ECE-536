@@ -42,7 +42,7 @@ uint16_t sensorMaxVal[LS_NUM_SENSORS];
 uint16_t sensorMinVal[LS_NUM_SENSORS];
 
 
-int numRuns;
+int numRuns = 0;
 
 // P Controller
 double Ke = 1.5*(0.5 / 3500); // Range of output/max error
@@ -77,10 +77,10 @@ void simpleCalibrate()
 
 void floorCalibration()
 {
+  String btnMsg = "";
   /* Place Robot On Floor (no line) */
   delay(2000);
-  String btnMsg = "Push left button on Launchpad to begin calibration.\n";
-  btnMsg += "Make sure the robot is on the floor away from the line.\n";
+ 
   /* Wait until button is pressed to start robot */
   waitBtnPressed(LP_LEFT_BTN, btnMsg, RED_LED); //Turn off for system ID
 
@@ -89,9 +89,7 @@ void floorCalibration()
   debugln("Running calibration on floor");
   simpleCalibrate();
   debugln("Reading floor values complete");
-
-  btnMsg = "Push left button on Launchpad to begin line following.\n";
-  btnMsg += "Make sure the robot is on the line.\n";
+ 
   /* Wait until button is pressed to start robot */
   waitBtnPressed(LP_LEFT_BTN, btnMsg, RED_LED); //Turn off for system ID
   delay(1000);
@@ -122,11 +120,12 @@ void loop()
     lastPos = getPosition();
   }
 
+  if (numRuns == 100) {
+    center = 5500;
+  }
 
   uint32_t linePos = getPosition();
   int error = linePos - center;
-  
-
   
   double adjustment = error * Ke;
   double DRnow = DR + adjustment;
@@ -148,7 +147,7 @@ void loop()
   PLXout(" ,");
   PLXout(error);
   PLXout(" ,");
-//  PLXout(estPos);
+  PLXout(center);
   PLXoutln(" ,");
   //delay(500);
   
