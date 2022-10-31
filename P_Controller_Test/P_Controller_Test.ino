@@ -47,7 +47,18 @@ int numRuns = 0;
 // P Controller
 double Ke = 1.5*(0.5 / 3500); // Range of output/max error
 double DR = 0.5;
-volatile int center = 3500;
+volatile int center = 2500;
+
+// I and D controllers
+double Ki = 0;
+double Kd = 0;
+
+volatile unsigned long TimeStart = millis();
+volatile unsigned long TimeEnd= millis();
+
+volatile unsigned long ErrorEnd;
+volatile unsigned long derror;
+volatile unsigned long i;
 
 void setup()
 {
@@ -111,6 +122,7 @@ uint32_t getPosition()
 
 void loop()
 {
+
   uint32_t lastPos;
   /* Run this setup only once */
   if (isCalibrationComplete == false)
@@ -121,13 +133,26 @@ void loop()
   }
 
   if (numRuns == 100) {
-    center = 5500;
+    center = 3500;
   }
 
   uint32_t linePos = getPosition();
   int error = linePos - center;
+ 
+  TimeEnd = millis();
   
-  double adjustment = error * Ke;
+  unsigned long dTime = TimeEnd - TimeStart;
+  
+  i += dTime*(error);
+  double d = (error)/dTime;
+  TimeStart = millis();
+  
+  error = linePos - center;
+  i -= dTime*error;
+  d -= (error)/dTime;
+
+   
+  double adjustment = (error * Ke) + (i * Ki) + (d*Kd);
   double DRnow = DR + adjustment;
   DRnow= constrain(DRnow, 0, 1);
   setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
@@ -149,8 +174,11 @@ void loop()
   PLXout(" ,");
   PLXout(center);
   PLXoutln(" ,");
+   PLXout(i);
+  PLXoutln(" ,");
   //delay(500);
   
   numRuns = numRuns + 1;
 //   debugln("Number of Loop it. = " + String(numRuns))
+
 }
