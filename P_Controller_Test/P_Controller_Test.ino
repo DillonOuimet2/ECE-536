@@ -49,11 +49,9 @@ double Ke = 1.5*(0.5 / 3500); // Range of output/max error
 double DR = 0.5;
 volatile int center = 2500;
 
-<<<<<<< Updated upstream
-=======
 // I and D controllers
-double Ki = 1.35;
-double Kd = 0.0000073925;
+double Ki = 0;
+double Kd = 0;
 
 volatile unsigned long TimeStart = millis();
 volatile unsigned long TimeEnd= millis();
@@ -62,7 +60,6 @@ volatile unsigned long ErrorEnd;
 volatile unsigned long derror;
 volatile unsigned long i;
 
->>>>>>> Stashed changes
 void setup()
 {
   Serial.begin(9600);
@@ -125,10 +122,7 @@ uint32_t getPosition()
 
 void loop()
 {
-<<<<<<< Updated upstream
-=======
 
->>>>>>> Stashed changes
   uint32_t lastPos;
   /* Run this setup only once */
   if (isCalibrationComplete == false)
@@ -139,19 +133,11 @@ void loop()
   }
 
   if (numRuns == 100) {
-<<<<<<< Updated upstream
-    center = 5500;
-=======
     center = 3500;
->>>>>>> Stashed changes
   }
 
   uint32_t linePos = getPosition();
   int error = linePos - center;
-<<<<<<< Updated upstream
-  
-  double adjustment = error * Ke;
-=======
  
   TimeEnd = millis();
   
@@ -167,7 +153,6 @@ void loop()
 
    
   double adjustment = (error * Ke) + (i * Ki) + (d*Kd);
->>>>>>> Stashed changes
   double DRnow = DR + adjustment;
   DRnow= constrain(DRnow, 0, 1);
   setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
@@ -188,11 +173,8 @@ void loop()
   PLXout(error);
   PLXout(" ,");
   PLXout(center);
-<<<<<<< Updated upstream
-=======
   PLXoutln(" ,");
    PLXout(i);
->>>>>>> Stashed changes
   PLXoutln(" ,");
   //delay(500);
   
