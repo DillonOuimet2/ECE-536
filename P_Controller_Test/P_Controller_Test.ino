@@ -24,35 +24,44 @@
 #define PLXoutln(x)
 #endif
 
+// Function Prototypes
 void setupEncoder(uint8_t ela_pin, uint8_t elb_pin, uint8_t era_pin, uint8_t erb_pin); // initalize the encoders
-
 void setRawMotorSpeed(uint8_t motorNum, uint8_t speed);
 
+// Pin Configurations
 const int trigPin = 32; // This is Port Pin 3.5 on the MSP432 Launchpad
 const int echoPin = 33; // This is Port Pin 5.1 on the MSP432 Launchpad
 
+// Calibration Global Variables
 uint8_t lineColor = DARK_LINE; // DARK_LINE or LIGHT_LINE
 bool isCalibrationComplete = false;
 
+// Motor Speed Global Variables
 uint16_t SM = 1;
 uint16_t Speed = SM*0.3*255;
+double DR = 0.5;
 
+// Sensor Global Variables
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
 uint16_t sensorMaxVal[LS_NUM_SENSORS];
 uint16_t sensorMinVal[LS_NUM_SENSORS];
 
-
+// Num Runs
 int numRuns = 0;
 
+/* PID Controller Variables */
 // P Controller
-double Ke = 1.5*(0.5 / 3500); // Range of output/max error
-double DR = 0.5;
+double Ke = 0.00091083; //1.5*(0.5 / 3500); // Range of output/max error
 volatile int center = 2500;
 
 // I and D controllers
-double Ki = 0;
+double Ki = 1.6641;
+double totError = 0;
+
 double Kd = 0;
+double dError;
+double OldError;
 
 volatile unsigned long TimeStart = millis();
 volatile unsigned long TimeEnd= millis();
@@ -75,6 +84,8 @@ void setup()
   clearMinMax(sensorMinVal, sensorMaxVal);
 
   delay(1000);
+
+  floorCalibration();
 }
 
 void simpleCalibrate()
@@ -117,21 +128,14 @@ uint32_t getPosition()
   // could use average
   
   return getLinePosition(sensorCalVal, lineColor);
-  
 }
 
 
 void loop()
 {
-
+  
+  
   uint32_t lastPos;
-  /* Run this setup only once */
-  if (isCalibrationComplete == false)
-  {
-    floorCalibration();
-    isCalibrationComplete = true;
-    lastPos = getPosition();
-  }
 
   if (numRuns == 100) {
     center = 3500;
@@ -140,22 +144,27 @@ void loop()
   uint32_t linePos = getPosition();
   int error = linePos - center;
  
-  TimeEnd = millis();
   
+  TimeEnd = millis();
   unsigned long dTime = TimeEnd - TimeStart;
   
-  i += dTime*(error);
-  double d = (error)/dTime;
-  TimeStart = millis();
+  
+
+  
+ 
   
   error = linePos - center;
-  i -= dTime*error;
-  d -= (error)/dTime;
+  
+  totError += error;
+  dError = error - OldError;
+  
+  i = dTime*totError;
+  double d = (dError)/dTime;
 
    
-  double adjustment = (error * (Ke/SM) ) + (i * Ki) + (d*Kd);
+  double adjustment = (error * (Ke/SM)) + (constrain(i * Ki,0, 1)) + (d*Kd);
   double DRnow = DR + adjustment;
-  DRnow= constrain(DRnow, 0, 1);
+  DRnow = constrain(DRnow, 0, 1);
   setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
   setRawMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
 
@@ -175,11 +184,19 @@ void loop()
   PLXout(" ,");
   PLXout(center);
   PLXoutln(" ,");
-   PLXout(i);
-  PLXoutln(" ,");
+  
   //delay(500);
   
   numRuns = numRuns + 1;
 //   debugln("Number of Loop it. = " + String(numRuns))
+
+OldError = error;
+//int itTime = 9;
+//if ( (millis() - TimeEnd) < itTime) {
+//  delay(itTime-(millis() - TimeEnd));
+//}
+// PLXout(millis() - TimeEnd);
+//  PLXoutln(" s");
+TimeStart = TimeEnd;
 
 }
