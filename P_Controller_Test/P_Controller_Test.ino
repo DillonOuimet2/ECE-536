@@ -40,6 +40,7 @@ bool isCalibrationComplete = false;
 uint16_t SM = 1;
 uint16_t Speed = SM*0.3*255;
 double DR = 0.5;
+double DRnow;
 
 // Sensor Global Variables
 uint16_t sensorVal[LS_NUM_SENSORS];
@@ -51,9 +52,13 @@ uint16_t sensorMinVal[LS_NUM_SENSORS];
 int numRuns = 0;
 
 /* PID Controller Variables */
+uint32_t linePos;
+int error;
+double adjustment;
+
 // P Controller
-double Ke = 0.00091083; //1.5*(0.5 / 3500); // Range of output/max error
-volatile int center = 2500;
+double Ke = 0.00091083; // OG Ke = 1.5*(0.5 / 3500); 
+volatile int center = 3500;
 
 // I and D controllers
 double Ki = 1.6641;
@@ -61,14 +66,15 @@ double totError = 0;
 
 double Kd = 0;
 double dError;
-double OldError;
+double errorLast;
 
-volatile unsigned long TimeStart = millis();
-volatile unsigned long TimeEnd= millis();
+volatile unsigned long timeLast = millis();
+volatile unsigned long timeNow= millis();
 
 volatile unsigned long ErrorEnd;
 volatile unsigned long derror;
 volatile unsigned long i;
+volatile unsigned long d;
 
 void setup()
 {
@@ -130,44 +136,38 @@ uint32_t getPosition()
   return getLinePosition(sensorCalVal, lineColor);
 }
 
-
-void loop()
+void CalculatePID(void) 
 {
-  
-  
-  uint32_t lastPos;
+  // Calculate time from last calculation
+  unsigned long timeNow = millis();
+  unsigned long dTime = timeNow - timeLast;
 
-  if (numRuns == 100) {
-    center = 3500;
-  }
-
-  uint32_t linePos = getPosition();
-  int error = linePos - center;
- 
-  
-  TimeEnd = millis();
-  unsigned long dTime = TimeEnd - TimeStart;
-  
-  
-
-  
- 
-  
+  // Compute Working Error Variables
+  linePos = getPosition();
   error = linePos - center;
-  
   totError += error;
-  dError = error - OldError;
-  
   i = dTime*totError;
-  double d = (dError)/dTime;
+  dError = error - errorLast;
+  d = (dError)/dTime;
 
-   
-  double adjustment = (error * (Ke/SM)) + (constrain(i * Ki,0, 1)) + (d*Kd);
-  double DRnow = DR + adjustment;
+  // Compute PID Adjustment
+  adjustment = (error * (Ke/SM)) + (constrain(i * Ki,0, 1)) + (d*Kd);
+
+  // Save time and error
+  errorLast = error;
+  timeLast = timeNow; 
+}
+
+void SetMotorSpeedPID(void) 
+{
+  DRnow = DR + adjustment;
   DRnow = constrain(DRnow, 0, 1);
   setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
   setRawMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
+}
 
+void PLXSerialOuput(void)
+{
   debugln("linePos = " + String(linePos) + " DR = " + String(DRnow) + " Error = " + String(error));
   debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
 
@@ -184,19 +184,30 @@ void loop()
   PLXout(" ,");
   PLXout(center);
   PLXoutln(" ,");
-  
-  //delay(500);
+
+  //   debugln("Number of Loop it. = " + String(numRuns))
+}
+
+void loop()
+{
+  uint32_t lastPos;
+
+  if (numRuns == 100) {
+    center = 2500;
+  }
+
+  CalculatePID();
+
+  SetMotorSpeedPID();
   
   numRuns = numRuns + 1;
-//   debugln("Number of Loop it. = " + String(numRuns))
-
-OldError = error;
+ 
+/* Timing Function
 //int itTime = 9;
-//if ( (millis() - TimeEnd) < itTime) {
-//  delay(itTime-(millis() - TimeEnd));
+//if ( (millis() - timeNow) < itTime) {
+//  delay(itTime-(millis() - timeNow));
 //}
-// PLXout(millis() - TimeEnd);
+// PLXout(millis() - timeNow);
 //  PLXoutln(" s");
-TimeStart = TimeEnd;
-
+*/
 }
