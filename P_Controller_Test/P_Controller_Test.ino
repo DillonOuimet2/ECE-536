@@ -53,6 +53,7 @@ int numRuns = 0;
 
 /* PID Controller Variables */
 uint32_t linePos;
+uint32_t lastLine; 
 int error;
 double adjustment;
 
@@ -144,6 +145,11 @@ void CalculatePID(void)
 
   // Compute Working Error Variables
   linePos = getPosition();
+
+  //Check to see if the bot has lost the line.
+  if (linePos == 0){
+    Pivot();
+  }
   error = linePos - center;
   totError += error;
   i = dTime*totError;
@@ -155,7 +161,10 @@ void CalculatePID(void)
 
   // Save time and error
   errorLast = error;
-  timeLast = timeNow; 
+  timeLast = timeNow;
+
+  lastLine = linePos;
+   
 }
 
 void SetMotorSpeedPID(void) 
@@ -186,6 +195,31 @@ void PLXSerialOuput(void)
   PLXoutln(" ,");
 
   //   debugln("Number of Loop it. = " + String(numRuns))
+}
+
+// Function to pivot 90 degrees.
+void Pivot(){
+
+  disableMotor(BOTH_MOTORS);
+  delay(10);
+  //if the position was last >3500 turn cw otherwise turn ccw
+
+  if (lastLine > 3500) {
+    setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_BACKWARD); //In order to turn CW, the right motor needs to turn backwards and the left forward.
+    setMotorDirection(LEFT_MOTOR, MOTOR_DIR_FORWARD);
+  }
+  else {
+    setMotorDirection(LEFT_MOTOR, MOTOR_DIR_BACKWARD); //In order to turn CCW, the left motor needs to turn backwards and the righ forward.
+    setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_FORWARD);
+  }
+
+  //Now turn until the robot has reached the center. 
+  while ( (linePos > (center + 50)) || (linePos < (center - 50)) ){
+    linePos = getPosition();
+  }
+  disableMotor(BOTH_MOTORS);
+  delay (10);
+  setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
 }
 
 void loop()
