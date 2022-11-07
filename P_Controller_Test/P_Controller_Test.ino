@@ -207,10 +207,16 @@ void Pivot(){
   if (lastLine > 3500) {
     setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_BACKWARD); //In order to turn CW, the right motor needs to turn backwards and the left forward.
     setMotorDirection(LEFT_MOTOR, MOTOR_DIR_FORWARD);
+    enableMotor(BOTH_MOTORS);
+    setRawMotorSpeed(LEFT_MOTOR, Speed);
+    setRawMotorSpeed(RIGHT_MOTOR, Speed);
   }
   else {
     setMotorDirection(LEFT_MOTOR, MOTOR_DIR_BACKWARD); //In order to turn CCW, the left motor needs to turn backwards and the righ forward.
     setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_FORWARD);
+    enableMotor(BOTH_MOTORS);
+    setRawMotorSpeed(LEFT_MOTOR, 0.5 * Speed);
+    setRawMotorSpeed(RIGHT_MOTOR, 0.5 * Speed);
   }
 
   //Now turn until the robot has reached the center. 
@@ -220,6 +226,9 @@ void Pivot(){
   disableMotor(BOTH_MOTORS);
   delay (10);
   setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
+  enableMotor(BOTH_MOTORS);
+  setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
+  setRawMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed)); 
 }
 
 void loop()
