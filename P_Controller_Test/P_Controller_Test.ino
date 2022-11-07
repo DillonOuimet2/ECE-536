@@ -120,7 +120,42 @@ uint32_t getPosition()
   
 }
 
+//uint16_t getIndividualReading(uint16_t* calVal)
+// {
+//   for (uint16_t i = 0; i < LS_NUM_SENSORS; i++)
+//   {
+//     uint16_t value = calVal[i];
+//  
+//     // only average in values that are above a noise threshold
+//
+//   }
+//   return calVal;
+// }
+// 
 
+ uint32_t getLinePosition(uint16_t* calVal, uint8_t mode)
+ {
+  
+   uint32_t avg = 0; // this is for the weighted total
+   uint32_t sum = 0; // this is for the denominator, which is <= 64000
+  
+   uint32_t _lastPosition;
+   for (uint8_t i = 0; i < LS_NUM_SENSORS; i++)
+   {
+     uint16_t value = calVal[i];
+  
+     // only average in values that are above a noise threshold
+     if (value > 50)
+     {
+       avg += (uint32_t)value * (i * 1000);
+       sum += value;
+     }
+   }
+  
+   _lastPosition = avg / sum;
+   return _lastPosition;
+ }
+ 
 void loop()
 {
 
