@@ -166,13 +166,12 @@ void SetMotorSpeedPID(void)
   setRawMotorSpeed(RIGHT_MOTOR, ((1 - DRnow) * Speed));
 }
 
-void PLXSerialOuput(void)
+void PLXSerialOutput(void)
 {
   debugln("linePos = " + String(linePos) + " DR = " + String(DRnow) + " Error = " + String(error));
   debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
 
   // PLX Data Out
-  volatile unsigned long timeNow = millis();
   PLXout("DATA, TIME,");
   PLXout(timeNow);
   PLXout(" ,");
@@ -199,6 +198,8 @@ void loop()
   CalculatePID();
 
   SetMotorSpeedPID();
+
+  PLXSerialOutput();
   
   numRuns = numRuns + 1;
  
