@@ -62,7 +62,7 @@ double Ke = 0.00091083; // OG Ke = 1.5*(0.5 / 3500);
 volatile int center = 3500;
 
 // I and D controllers
-double Ki = 1.6641;
+double Ki = 0; //1.6641;
 double totError = 0;
 
 double Kd = 0;
@@ -236,7 +236,10 @@ void loop()
   uint32_t lastPos;
 
   if (numRuns == 100) {
-    center = 3500;
+    center = 7000000000;
+  }
+  else {
+   center = 3500;
   }
 
   CalculatePID();
