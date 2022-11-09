@@ -208,8 +208,8 @@ void Pivot(){
     setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_BACKWARD); //In order to turn CW, the right motor needs to turn backwards and the left forward.
     setMotorDirection(LEFT_MOTOR, MOTOR_DIR_FORWARD);
     enableMotor(BOTH_MOTORS);
-    setRawMotorSpeed(LEFT_MOTOR, Speed);
-    setRawMotorSpeed(RIGHT_MOTOR, Speed);
+    setRawMotorSpeed(LEFT_MOTOR, 0.5 * Speed);
+    setRawMotorSpeed(RIGHT_MOTOR, 0.5 * Speed);
   }
   else {
     setMotorDirection(LEFT_MOTOR, MOTOR_DIR_BACKWARD); //In order to turn CCW, the left motor needs to turn backwards and the righ forward.
@@ -236,12 +236,14 @@ void loop()
   uint32_t lastPos;
 
   if (numRuns == 100) {
-    center = 2500;
+    center = 3500;
   }
 
   CalculatePID();
 
   SetMotorSpeedPID();
+
+  PLXSerialOuput();
   
   numRuns = numRuns + 1;
  
