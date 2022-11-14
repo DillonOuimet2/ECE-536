@@ -38,7 +38,7 @@ bool isCalibrationComplete = false;
 
 // Motor Speed Global Variables
 uint16_t SM = 1;
-uint16_t Speed = SM*0.3*255;
+uint16_t Speed = SM*0.35*255;
 double DR = 0.5;
 double DRnow;
 
