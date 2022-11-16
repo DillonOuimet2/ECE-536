@@ -4,7 +4,7 @@
 
 // Debug Control
 #define DEBUG 0
-#define PLX 1
+#define PLX 0
 
 #if DEBUG == 1
 #define debugln(x) Serial.println(x)
@@ -58,11 +58,11 @@ int error;
 double adjustment;
 
 // P Controller
-double Ke = 0.00091083; // OG Ke = 1.5*(0.5 / 3500); 
+double Ke = 0.0011664; // OG Ke = 1.5*(0.5 / 3500); 
 volatile int center = 3500;
 
 // I and D controllers
-double Ki = 1.6641;
+double Ki = 0.00092462;
 double totError = 0;
 
 double Kd = 0;
@@ -151,13 +151,13 @@ void CalculatePID(void)
     Pivot();
   }
   error = linePos - center;
-  totError += error;
-  i = dTime*totError;
+//  totError += error;
+  i += Ki*(dTime * (error));
   dError = error - errorLast;
   d = (dError)/dTime;
 
   // Compute PID Adjustment
-  adjustment = (error * (Ke/SM)) + (constrain(i * Ki,0, 1)) + (d*Kd);
+  adjustment = (error * (Ke/SM)) + (constrain(i, 0, 1)) + (d*Kd);
 
   // Save time and error
   errorLast = error;
@@ -236,7 +236,7 @@ void loop()
   uint32_t lastPos;
 
   if (numRuns == 100) {
-    center = 3500;
+    center = 2500;
   }
 
   CalculatePID();

@@ -4,7 +4,7 @@
 
 // Debug Control
 #define DEBUG 0
-#define PLX 1
+#define PLX 0
 
 #if DEBUG == 1
 #define debugln(x) Serial.println(x)
@@ -46,20 +46,31 @@ uint16_t sensorMinVal[LS_NUM_SENSORS];
 int numRuns = 0;
 
 // P Controller
-double Ke = .00057; //1.5*(0.5 / 3500); // Range of output/max error
+double Ke = 0.0011664; //1.5*(0.5 / 3500); // Range of output/max error
 double DR = 0.5;
 volatile int center = 3500;
 
-// I and D controllers
-double Ki = 0.00059;
-double Kd = 0;// 01.35e-5;
 
-volatile unsigned long TimeStart = millis();
-volatile unsigned long TimeEnd= millis();
+uint32_t lastLine; 
+int error;
+double adjustment;
+
+// I and D controllers
+double Ki = 0.00092462;
+double totError = 0;
+
+double Kd = 0;
+double dError;
+double errorLast;
+
+volatile unsigned long timeLast = millis();
+volatile unsigned long timeNow= millis();
 
 volatile unsigned long ErrorEnd;
 volatile unsigned long derror;
 volatile unsigned long i;
+volatile unsigned long d;
+
 
 void setup()
 {
@@ -124,6 +135,9 @@ uint32_t getPosition()
 void loop()
 {
 
+  unsigned long timeNow = millis();
+  unsigned long dTime = timeNow - timeLast;
+
   uint32_t lastPos;
   /* Run this setup only once */
   if (isCalibrationComplete == false)
@@ -142,21 +156,18 @@ void loop()
     linePos = LastPos;
   }
   int error = linePos - center;
- 
-  TimeEnd = millis();
-  
-  unsigned long dTime = TimeEnd - TimeStart;
-  
-  i += dTime*(error);
-  double d = (error)/dTime;
-  TimeStart = millis();
-  
-  error = linePos - center;
-  i -= dTime*error;
-  d -= (error)/dTime;
 
-   
-  double adjustment = (error * Ke) + (i * Ki) + (d*Kd);
+  i += Ki* dTime*error;
+  dError = error - errorLast;
+  d = (dError)/dTime;
+
+  // Compute PID Adjustment
+  adjustment = (error * (Ke)) + (constrain(i,0, 1)) + (d*Kd);
+
+  // Save time and error
+  errorLast = error;
+  timeLast = timeNow;
+  
   double DRnow = DR + adjustment;
   DRnow= constrain(DRnow, 0, 1);
   setRawMotorSpeed(LEFT_MOTOR, ((DRnow)*Speed));
@@ -166,7 +177,7 @@ void loop()
   debugln(" LSpeed = " + String(DRnow * Speed) + " RSpeed = " + String((1 - DRnow) * Speed));
 
   // PLX Data Out
-  volatile unsigned long timeNow = millis();
+  timeNow = millis();
   PLXout("DATA, TIME,");
   PLXout(timeNow);
   PLXout(" ,");
