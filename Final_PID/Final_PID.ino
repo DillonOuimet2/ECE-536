@@ -58,16 +58,25 @@ int error;
 double adjustment;
 
 // P Controller
-double Ke = 0.0011664; // OG Ke = 1.5*(0.5 / 3500); 
+double Ke =0.0018097; // OG Ke = 1.5*(0.5 / 3500); 
 volatile int center = 3500;
 
 // I and D controllers
-double Ki = 0.00092462;
+double Ki = 0;
 double totError = 0;
 
-double Kd = 0;
+double Kd =-3.360204e-6;
 double dError;
 double errorLast;
+double Integ=0;
+double Integ_last=0;
+double sat_max=1;
+double sat_min=0;
+
+// Set the loop time
+double TimeMax = 100;
+unsigned long loopTime =9;
+unsigned long dTime;
 
 volatile unsigned long timeLast = millis();
 volatile unsigned long timeNow= millis();
@@ -141,7 +150,7 @@ void CalculatePID(void)
 {
   // Calculate time from last calculation
   unsigned long timeNow = millis();
-  unsigned long dTime = timeNow - timeLast;
+ 
 
   // Compute Working Error Variables
   linePos = getPosition();
@@ -152,19 +161,36 @@ void CalculatePID(void)
   }
   error = linePos - center;
 //  totError += error;
-  i += Ki*(dTime * (error));
+
+//////////////////////////////////////
+
+//if ((Integ_last==sat_max) && ((Ki*dTime*0.5*(error + errorLast))>0)){
+//Integ=sat_max;
+//}
+//else if ((Integ_last==sat_min) && ((Ki*dTime*0.5*(error + errorLast))<0)){
+//Integ=sat_min;}
+//else{
+//Integ= Integ_last + (Ki*dTime*0.5*(error + errorLast));
+//}
+///////////////////////////////////////////////////
+Integ= Integ_last + (Ki*(loopTime/1000)*0.5*(error + errorLast));
+  //i += Ki*(dTime * (error));
   dError = error - errorLast;
-  d = (dError)/dTime;
+  d = (dError)/(loopTime);
 
   // Compute PID Adjustment
-  adjustment = (error * (Ke/SM)) + (constrain(i, 0, 1)) + (d*Kd);
+  adjustment = (error * (Ke/SM)) + constrain(Integ, 0, 1) + (d*Kd);
 
   // Save time and error
   errorLast = error;
-  timeLast = timeNow;
+  Integ_last=Integ;
+
+ 
+  timeLast = millis();
 
   lastLine = linePos;
-   
+  dTime = timeLast - timeNow;
+
 }
 
 void SetMotorSpeedPID(void) 
@@ -182,7 +208,7 @@ void PLXSerialOuput(void)
 
   // PLX Data Out
   volatile unsigned long timeNow = millis();
-  PLXout("DATA, TIME,");
+//  PLXout("DATA, TIME,");
   PLXout(timeNow);
   PLXout(" ,");
   PLXout(linePos);
@@ -193,6 +219,11 @@ void PLXSerialOuput(void)
   PLXout(" ,");
   PLXout(center);
   PLXoutln(" ,");
+  PLXout("dTime: ");
+  PLXout(dTime);
+  PLXout(" Loop Time: ");
+  PLXout(loopTime);
+  PLXoutln(", ");
 
   //   debugln("Number of Loop it. = " + String(numRuns))
 }
@@ -233,10 +264,11 @@ void Pivot(){
 
 void loop()
 {
+  unsigned long timeStart = millis();
   uint32_t lastPos;
 
   if (numRuns == 100) {
-    center = 2500;
+    center = 3500;
   }
 
   CalculatePID();
@@ -257,4 +289,12 @@ void loop()
 */
 
 //Test
+
+ unsigned long timeEnd = millis();
+ loopTime = timeEnd - timeStart;
+//  if (loopTime < TimeMax) {
+//
+//   delay(TimeMax - loopTime);
+//    
+//  }
 }
