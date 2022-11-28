@@ -37,8 +37,8 @@ uint8_t lineColor = DARK_LINE; // DARK_LINE or LIGHT_LINE
 bool isCalibrationComplete = false;
 
 // Motor Speed Global Variables
-uint16_t SM = 1;
-uint16_t Speed = SM*0.3*255;
+
+uint16_t Speed = 0.3*255;
 double DR = 0.5;
 double DRnow;
 
@@ -50,32 +50,40 @@ uint16_t sensorMinVal[LS_NUM_SENSORS];
 
 // Num Runs
 int numRuns = 0;
+bool stepEn = false;
 
 /* PID Controller Variables */
 uint32_t linePos;
 uint32_t lastLine; 
 int error;
-double adjustment;
+float adjustment;
 
 // P Controller
-double Ke = 0.0011664; // OG Ke = 1.5*(0.5 / 3500); 
+float Ke = 0.0011664; // OG Ke = 1.5*(0.5 / 3500); 
 volatile int center = 3500;
 
 // I and D controllers
-double Ki = 0.00092462;
-double totError = 0;
+float Ki = 0.00092462;
+float totError = 0;
 
-double Kd = 0;
-double dError;
-double errorLast;
+float Kd = Ki*0.1;
+float dError;
+float errorLast;
 
 volatile unsigned long timeLast = millis();
 volatile unsigned long timeNow= millis();
 
-volatile unsigned long ErrorEnd;
-volatile unsigned long derror;
-volatile unsigned long i;
-volatile unsigned long d;
+float ErrorEnd;
+float i;
+float iold;
+float d;
+
+float maxOS;
+float minOS;
+volatile unsigned long stepTime;
+volatile unsigned long timeSettle;
+bool step;
+bool settled;
 
 void setup()
 {
@@ -93,6 +101,27 @@ void setup()
   delay(1000);
 
   floorCalibration();
+}
+
+void CheckOS(void) {
+  if (linePos > maxOS) {
+    maxOS = linePos;
+  }
+  if (linePos < minOS) {
+    minOS = linePos;
+  }
+}
+
+void CheckSettle(void) {
+  if ((linePos >= center*0.9) && (linePos <= center*1.1) && !settled) {
+    settled = true;
+    timeSettle = (millis()-stepTime)/1000;
+  }
+  else if ((linePos >= center*0.9) && (linePos <= center*1.1) && settled) {
+   }
+  else {
+    settled = false;
+  }
 }
 
 void simpleCalibrate()
@@ -152,13 +181,14 @@ void CalculatePID(void)
   }
   error = linePos - center;
 //  totError += error;
-  i += Ki*(dTime * (error));
+  // i = iold + (Ki*(dTime * error));
+  i = iold + dTime*error;
   dError = error - errorLast;
   d = (dError)/dTime;
 
   // Compute PID Adjustment
-  adjustment = (error * (Ke/SM)) + (constrain(i, 0, 1)) + (d*Kd);
-
+  adjustment = (error * (Ke)) + (constrain(i*Ki, 0, 1)) + (d*Kd);
+  iold = i;
   // Save time and error
   errorLast = error;
   timeLast = timeNow;
@@ -187,7 +217,7 @@ void PLXSerialOuput(void)
   PLXout(" ,");
   PLXout(linePos);
   PLXout(" ,");
-  PLXout(DRnow);
+  PLXoutln(DRnow);
   PLXout(" ,");
   PLXout(error);
   PLXout(" ,");
@@ -220,7 +250,7 @@ void Pivot(){
   }
 
   //Now turn until the robot has reached the center. 
-  while ( (linePos > (center + 50)) || (linePos < (center - 50)) ){
+  while ( (linePos > (center + 100)) || (linePos < (center - 100)) ){
     linePos = getPosition();
   }
   disableMotor(BOTH_MOTORS);
@@ -235,8 +265,23 @@ void loop()
 {
   uint32_t lastPos;
 
-  if (numRuns == 100) {
-    center = 2500;
+  if (numRuns == 500 && stepEn) {
+    center = 5500;
+    step = true;
+    stepTime = millis();
+  }
+
+  if (numRuns == 1000 && stepEn) {
+    Serial.print("Max Overshoot: ");
+    Serial.println(maxOS);
+    Serial.print("Min Overshoot: ");
+    Serial.println(minOS);
+    Serial.print("Settling Time: ");
+    Serial.println(timeSettle);
+    Serial.print("Last Position: ");
+    Serial.println(linePos);
+    Serial.print("Center: ");
+    Serial.println(center);
   }
 
   CalculatePID();
@@ -244,8 +289,16 @@ void loop()
   SetMotorSpeedPID();
 
   PLXSerialOuput();
+
+  if (step) {
+    CheckOS();
+    CheckSettle();
+  }
   
   numRuns = numRuns + 1;
+
+//  Serial.println(numRuns);
+//  delay(500);
  
 /* Timing Function
 //int itTime = 9;
